@@ -215,7 +215,9 @@ async function sendEmail(results) {
   });
 
   // Add a timestamp to the email
-  emailBody += `\n\nLast checked: ${new Date().toLocaleString()}`;
+  emailBody += `\n\nLast checked: ${new Date().toLocaleString("en-AU", {
+    timeZone: "Australia/Sydney",
+  })}`;
 
   try {
     let info = await transporter.sendMail({
