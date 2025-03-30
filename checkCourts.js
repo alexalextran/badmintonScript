@@ -216,7 +216,7 @@ async function sendEmail(results) {
 
   let info = await transporter.sendMail({
     from: `"Badminton Alert" <${EMAIL}>`,
-    to: "scriptenabler83@gmail.com",
+    to: process.env.RECIPIENT_EMAIL || "your-email@example.com",
     subject: `Badminton Courts Available (8PM - 10PM)`,
     text: emailBody,
   });
@@ -226,8 +226,8 @@ async function sendEmail(results) {
 
 async function checkAvailability() {
   // Toggle between automatic Friday detection and hardcoded dates
-  const datesToCheck = getUpcomingFridays(); // Dynamic calculation of upcoming Fridays
-  //const datesToCheck = getHardcodedDates(); // Use specific hardcoded dates
+  //const datesToCheck = getUpcomingFridays(); // Dynamic calculation of upcoming Fridays
+  const datesToCheck = getHardcodedDates(); // Use specific hardcoded dates
 
   console.log(
     "Dates to check:",
@@ -239,6 +239,7 @@ async function checkAvailability() {
     browser = await puppeteer.launch({
       headless: "new",
       defaultViewport: null,
+      args: ["--no-sandbox", "--disable-setuid-sandbox"], // Add these args for GitHub Actions
     });
     const page = await browser.newPage();
 
