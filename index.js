@@ -233,8 +233,8 @@ async function sendEmail(results) {
 
 async function checkAvailability() {
   // Toggle between automatic Friday detection and hardcoded dates
-  //const datesToCheck = getUpcomingFridays(); // Dynamic calculation of upcoming Fridays
-  const datesToCheck = getHardcodedDates(); // Use specific hardcoded dates
+  const datesToCheck = getUpcomingFridays(); // Dynamic calculation of upcoming Fridays
+  //const datesToCheck = getHardcodedDates(); // Use specific hardcoded dates
 
   console.log(
     "Dates to check:",
