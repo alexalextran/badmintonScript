@@ -199,8 +199,8 @@ async function sendEmail(results) {
   let transporter = nodemailer.createTransport({
     service: "gmail",
     auth: {
-      user: EMAIL,
-      pass: PASSWORD,
+      user: process.env.EMAIL,
+      pass: process.env.PASSWORD,
     },
   });
 
@@ -214,14 +214,21 @@ async function sendEmail(results) {
     }
   });
 
-  let info = await transporter.sendMail({
-    from: `"Badminton Alert" <${EMAIL}>`,
-    to: process.env.RECIPIENT_EMAIL || "your-email@example.com",
-    subject: `Badminton Courts Available (8PM - 10PM)`,
-    text: emailBody,
-  });
+  // Add a timestamp to the email
+  emailBody += `\n\nLast checked: ${new Date().toLocaleString()}`;
 
-  console.log("Email sent: ", info.response);
+  try {
+    let info = await transporter.sendMail({
+      from: `"Badminton Alert" <${process.env.EMAIL}>`,
+      to: process.env.RECIPIENT_EMAIL || "your-email@example.com",
+      subject: `Badminton Courts Available (8PM - 10PM)`,
+      text: emailBody,
+    });
+
+    console.log("Email sent: ", info.response);
+  } catch (error) {
+    console.error("Error sending email:", error);
+  }
 }
 
 async function checkAvailability() {
@@ -239,7 +246,12 @@ async function checkAvailability() {
     browser = await puppeteer.launch({
       headless: "new",
       defaultViewport: null,
-      args: ["--no-sandbox", "--disable-setuid-sandbox"], // Add these args for GitHub Actions
+      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || null,
+      args: [
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-dev-shm-usage",
+      ],
     });
     const page = await browser.newPage();
 
