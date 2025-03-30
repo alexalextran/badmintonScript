@@ -38,54 +38,85 @@ const TIME_SLOTS = [
   "11pm",
 ];
 
-async function getNextFriday() {
-  let nextFriday = new Date("2025-04-24");
-  console.log(`Hardcoded date for next Friday: ${nextFriday}`);
-  return nextFriday;
+// Function to get the upcoming Fridays to check
+function getUpcomingFridays() {
+  const today = new Date();
+  const currentDay = today.getDay(); // 0 is Sunday, 6 is Saturday
+  const currentHour = today.getHours();
+
+  // Calculate days until next Friday (5 is Friday)
+  let daysUntilThisFriday = 5 - currentDay;
+  if (daysUntilThisFriday < 0) daysUntilThisFriday += 7;
+
+  // If today is Friday and it's past a reasonable booking hour, skip to next Friday
+  const isPastBookingHours = currentDay === 5 && currentHour >= 20; // 8 PM
+  if (isPastBookingHours) {
+    daysUntilThisFriday = 7; // Skip to next Friday
+  }
+
+  // Calculate the dates for this Friday and next Friday
+  const thisFriday = new Date(today);
+  thisFriday.setDate(today.getDate() + daysUntilThisFriday);
+  thisFriday.setHours(0, 0, 0, 0);
+
+  const nextFriday = new Date(thisFriday);
+  nextFriday.setDate(thisFriday.getDate() + 7);
+
+  const fridaysToCheck = [];
+
+  // If it's not past booking hours or not Friday, add the current Friday
+  if (!isPastBookingHours) {
+    fridaysToCheck.push(thisFriday);
+  }
+
+  // Always add next Friday
+  fridaysToCheck.push(nextFriday);
+
+  // If current Friday is past, add the Friday after next week
+  if (isPastBookingHours || daysUntilThisFriday === 0) {
+    const fridayAfterNext = new Date(nextFriday);
+    fridayAfterNext.setDate(nextFriday.getDate() + 7);
+    fridaysToCheck.push(fridayAfterNext);
+  }
+
+  return fridaysToCheck;
 }
 
-async function takeScreenshot(page, filename) {
-  const screenshotPath = path.join(screenshotDir, filename);
-  await page.screenshot({
-    path: screenshotPath,
-    fullPage: true,
+// Function to use specific hardcoded dates instead of automatically calculating Fridays
+// Format: 'YYYY-MM-DD'
+function getHardcodedDates() {
+  // Add your specific dates here in ISO format 'YYYY-MM-DD'
+  const dateStrings = [
+    "2025-04-04", // Example: First Friday in April 2025
+    "2025-04-11", // Example: Second Friday in April 2025
+    "2025-04-18", // Example: Third Friday in April 2025
+  ];
+
+  // Convert string dates to Date objects
+  return dateStrings.map((dateStr) => {
+    const date = new Date(dateStr);
+    date.setHours(0, 0, 0, 0);
+    return date;
   });
-  console.log(`Screenshot saved: ${screenshotPath}`);
 }
 
-async function checkAvailability() {
-  let browser;
+async function checkAvailabilityForDate(page, date) {
+  const formattedDate = date.toLocaleDateString("en-GB", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+
+  console.log(`\nChecking availability for: ${formattedDate}`);
+
   try {
-    browser = await puppeteer.launch({
-      headless: "new",
-      defaultViewport: null,
-    });
-    const page = await browser.newPage();
-
-    // Increase timeout and wait for network idle
-    await page.setDefaultTimeout(30000);
-    await page.goto(URL, { waitUntil: "networkidle2" });
-    await takeScreenshot(page, "1-initial-page-load.png");
-
-    // Select the next Friday in the date picker
-    const nextFriday = await getNextFriday();
-    const formattedDate = nextFriday.toLocaleDateString("en-GB", {
-      weekday: "long",
-      day: "numeric",
-      month: "long",
-      year: "numeric",
-    });
-
-    console.log(`Formatted date for next Friday: ${formattedDate}`);
-
     // Wait for the calendar to be interactive
     await page.waitForSelector("#cal-btn");
     await page.click("#cal-btn");
-    console.log("Clicked on calendar button to open the date picker.");
 
     // Wait for the datepicker to be visible
     await page.waitForSelector("#ui-datepicker-div", { visible: true });
-    await takeScreenshot(page, "2-date-picker-opened.png");
 
     // Select the specific date using more precise selector
     await page.evaluate((dateStr) => {
@@ -101,17 +132,15 @@ async function checkAvailability() {
       if (typeof datePickerDateChanged === "function") {
         datePickerDateChanged();
       }
-    }, nextFriday.toISOString());
+    }, date.toISOString());
 
     // Use page.evaluate to create a delay
     await page.evaluate(() => {
       return new Promise((resolve) => setTimeout(resolve, 3000));
     });
-    await takeScreenshot(page, "3-date-selected.png");
 
     // Wait for the calendar view table to load
     await page.waitForSelector("#calendar_view_table", { timeout: 5000 });
-    await takeScreenshot(page, "4-calendar-view-loaded.png");
 
     // Check for available courts
     const courts = await page.evaluate(() => {
@@ -119,7 +148,7 @@ async function checkAvailability() {
       if (!table) return [];
 
       const rows = Array.from(table.querySelectorAll("tr"));
-      return rows.slice(1).map((row, rowIndex) => {
+      return rows.slice(1, -1).map((row, rowIndex) => {
         const cells = Array.from(row.querySelectorAll("td"));
         return {
           courtNumber: rowIndex + 1,
@@ -128,31 +157,6 @@ async function checkAvailability() {
           ),
         };
       });
-    });
-
-    await takeScreenshot(page, "5-court-availability.png");
-
-    // Detailed logging of available slots
-    console.log("Detailed Court Availability:");
-    courts.forEach((court) => {
-      console.log(`Court ${court.courtNumber}:`);
-
-      // Find and log available time slots
-      const availableSlotTimes = court.availableSlots.reduce(
-        (acc, isAvailable, index) => {
-          if (isAvailable) {
-            acc.push(TIME_SLOTS[index]);
-          }
-          return acc;
-        },
-        []
-      );
-
-      if (availableSlotTimes.length > 0) {
-        console.log(`  Available slots: ${availableSlotTimes.join(", ")}`);
-      } else {
-        console.log("  No available slots");
-      }
     });
 
     // Check 8PM - 10PM (index 15 and 16)
@@ -167,34 +171,31 @@ async function checkAvailability() {
       .filter(Boolean);
 
     console.log(
-      `\nCourts available between 8PM - 10PM: ${
+      `Courts available between 8PM - 10PM on ${formattedDate}: ${
         availableCourts.join(", ") || "None"
       }`
     );
 
-    if (availableCourts.length > 0) {
-      await sendEmail(availableCourts, formattedDate);
-    } else {
-      console.log("No courts available during the specified time.");
-    }
+    return {
+      date: formattedDate,
+      availableCourts: availableCourts,
+    };
   } catch (error) {
-    console.error("Error during script execution:", error);
-
-    // Take a screenshot of the error state if possible
-    if (browser) {
-      const pages = await browser.pages();
-      if (pages.length > 0) {
-        await takeScreenshot(pages[0], "error-screenshot.png");
-      }
-    }
-  } finally {
-    if (browser) {
-      await browser.close();
-    }
+    console.error(`Error checking availability for ${formattedDate}:`, error);
+    return {
+      date: formattedDate,
+      availableCourts: [],
+      error: error.message,
+    };
   }
 }
 
-async function sendEmail(courts, date) {
+async function sendEmail(results) {
+  if (!results.some((result) => result.availableCourts.length > 0)) {
+    console.log("No courts available during the specified time for any date.");
+    return;
+  }
+
   let transporter = nodemailer.createTransport({
     service: "gmail",
     auth: {
@@ -203,24 +204,64 @@ async function sendEmail(courts, date) {
     },
   });
 
-  // Attach screenshots to the email
-  const attachments = fs
-    .readdirSync(screenshotDir)
-    .filter((file) => file.endsWith(".png"))
-    .map((file) => ({
-      filename: file,
-      path: path.join(screenshotDir, file),
-    }));
+  // Create email body
+  let emailBody = "Available Courts (8PM - 10PM):\n\n";
+
+  results.forEach((result) => {
+    if (result.availableCourts.length > 0) {
+      emailBody += `${result.date}:\n`;
+      emailBody += `${result.availableCourts.join(", ")}\n\n`;
+    }
+  });
 
   let info = await transporter.sendMail({
     from: `"Badminton Alert" <${EMAIL}>`,
-    to: "your-email@example.com",
-    subject: `Courts Available on ${date} (8PM - 10PM)`,
-    text: `Available courts: ${courts.join(", ")}`,
-    attachments: attachments,
+    to: "scriptenabler83@gmail.com",
+    subject: `Badminton Courts Available (8PM - 10PM)`,
+    text: emailBody,
   });
 
   console.log("Email sent: ", info.response);
+}
+
+async function checkAvailability() {
+  // Toggle between automatic Friday detection and hardcoded dates
+  //const datesToCheck = getUpcomingFridays(); // Dynamic calculation of upcoming Fridays
+  const datesToCheck = getHardcodedDates(); // Use specific hardcoded dates
+
+  console.log(
+    "Dates to check:",
+    datesToCheck.map((d) => d.toDateString())
+  );
+
+  let browser;
+  try {
+    browser = await puppeteer.launch({
+      headless: "new",
+      defaultViewport: null,
+    });
+    const page = await browser.newPage();
+
+    // Increase timeout and wait for network idle
+    await page.setDefaultTimeout(30000);
+    await page.goto(URL, { waitUntil: "networkidle2" });
+
+    const results = [];
+
+    // Check availability for each date
+    for (const date of datesToCheck) {
+      const result = await checkAvailabilityForDate(page, date);
+      results.push(result);
+    }
+
+    // Send email if any available courts found
+    await sendEmail(results);
+  } catch (error) {
+    console.error("Error during script execution:", error);
+  }
+  if (browser) {
+    await browser.close();
+  }
 }
 
 checkAvailability();
