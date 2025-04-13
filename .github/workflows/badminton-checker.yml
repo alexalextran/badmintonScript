@@ -4,8 +4,8 @@ on:
   schedule:
     # Run every 30 minutes but not between 11 PM and 6:30 AM AEST
     # AEST is UTC+10, so this is 1 PM - 8:30 PM UTC
-    - cron: "*/30 8-12 * * *" # 6:30 PM - 11:00 PM AEST (8:30 AM - 1:00 PM UTC)
-    - cron: "*/30 0-7 * * *" # 10:00 AM - 6:00 PM AEST (0:00 AM - 8:00 AM UTC)
+    - cron: "*/30 20-23 * * *" # 6:30 AM - 10:00 AM AEST (8:30 PM - 11:59 PM UTC)
+    - cron: "*/30 0-13 * * *" # 10:00 AM - 11:00 PM AEST (0:00 AM - 1:00 PM UTC)
   workflow_dispatch: # Allows manual triggering from GitHub UI
 
 jobs:
