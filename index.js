@@ -39,7 +39,7 @@ const TIME_SLOTS = [
 function loadDatesToIgnore() {
   try {
     const data = fs.readFileSync(
-      path.join(__dirname, "datesToIgnore.json"),
+      path.join(__dirname, "dateToIgnore.json"),
       "utf8"
     );
     const parsedData = JSON.parse(data);
